@@ -7,3 +7,9 @@ To install using [Homebrew](https://brew.sh/):
 ``` sh
 $ brew install flowerinthenight/tap/g-ssh-cmd
 ```
+
+Basic usage looks something like:
+
+``` sh
+$ g-ssh-cmd my-autoscaling-group 'uptime' --id-file ~/.ssh/key.pem
+```
