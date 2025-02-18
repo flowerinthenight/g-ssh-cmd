@@ -7,7 +7,7 @@
 *.dll
 *.so
 *.dylib
-asg-ssh-cmd
+g-ssh-cmd
 
 # Test binary, built with `go test -c`
 *.test

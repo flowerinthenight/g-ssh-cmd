@@ -1,4 +1,4 @@
-module github.com/flowerinthenight/asg-ssh-cmd
+module github.com/flowerinthenight/g-ssh-cmd
 
 go 1.24.0
 
