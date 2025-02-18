@@ -198,7 +198,7 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(&line, " --project=%v", project)
 		}
 
-		out, err := exec.Command("bash", "-c", line.String()).CombinedOutput()
+		out, err := exec.Command("sh", "-c", line.String()).CombinedOutput()
 		if err != nil {
 			fail(err, "-->", string(out))
 			return
@@ -256,7 +256,7 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Fprintf(&line, " --zone=%v", zone)
 		}
 
-		out, err = exec.Command("bash", "-c", line.String()).CombinedOutput()
+		out, err = exec.Command("sh", "-c", line.String()).CombinedOutput()
 		if err != nil {
 			fail(err, "-->", string(out))
 			return
@@ -286,7 +286,7 @@ func run(cmd *cobra.Command, args []string) {
 			}
 
 			fmt.Fprintf(&add, " --command='%v' -- -t", args[2])
-			addcmd := exec.Command("bash", "-c", add.String())
+			addcmd := exec.Command("sh", "-c", add.String())
 
 			mtx.Lock()
 			cs[name] = addcmd
