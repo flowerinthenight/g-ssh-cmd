@@ -35,8 +35,8 @@ var (
 
 	rootCmd = &cobra.Command{
 		Use:   "g-ssh-cmd <group-name> 'cmd'",
-		Short: "A simple wrapper to [ssh -i key ec2-user@target -t 'cmd'] for AWS AutoScaling Groups",
-		Long: `A simple wrapper to [ssh -i key ec2-user@target -t 'cmd'] for AWS AutoScaling Groups.
+		Short: "A simple wrapper to [ssh user@host -t 'cmd'] for AWS ASGs and GCP MIGs",
+		Long: `A simple wrapper to [ssh user@host -t 'cmd'] for AWS ASGs and GCP MIGs.
 
 [version=` + version + `, commit=` + commit + `]`,
 		Run:          run,
@@ -94,12 +94,13 @@ func main() {
 		os.Exit(0)
 	}()
 
+	rootCmd.Flags().SortFlags = false
 	rootCmd.Flags().StringVar(&vendor, "vendor", "aws", "target vendor, values: 'aws', 'gcp'")
-	rootCmd.Flags().StringVar(&idFile, "id-file", "", "identity file, input to -i in ssh")
+	rootCmd.Flags().StringVar(&idFile, "id-file", "", "identity file, input to -i in ssh (AWS only)")
 	rootCmd.Flags().BoolVar(&stdout, "stdout", true, "print stdout output")
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
-	rootCmd.Flags().StringVar(&gcpProject, "gcp-project", "", "GCP project name, optional (inferred)")
-	rootCmd.Flags().StringVar(&gcpRegion, "gcp-region", "", "GCP region, optional (inferred)")
+	rootCmd.Flags().StringVar(&gcpProject, "gcp-project", "", "valid only if --vendor=gcp, optional (inferred)")
+	rootCmd.Flags().StringVar(&gcpRegion, "gcp-region", "", "valid only if --vendor=gcp, optional (inferred)")
 	rootCmd.Execute()
 }
 
