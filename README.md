@@ -11,9 +11,9 @@ $ brew install flowerinthenight/tap/g-ssh-cmd
 Basic usage looks something like:
 
 ``` sh
-# Tail AWS ASG VMs' system logs:
+# Tail all AWS ASG VMs' system logs:
 $ g-ssh-cmd my-autoscaling-group 'journalctl -f' --id-file ~/.ssh/key.pem
 
-# Tail GCP MIG VMs system logs:
+# Tail all GCP MIG VMs' system logs:
 $ g-ssh-cmd --vendor=gcp my-mig 'journalctl -f'
 ```
