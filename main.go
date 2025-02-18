@@ -127,7 +127,7 @@ func run(cmd *cobra.Command, args []string) {
 
 		out, err := exec.Command("aws", line...).CombinedOutput()
 		if err != nil {
-			fail(err)
+			fail(err, "-->", string(out))
 			return
 		}
 
@@ -155,14 +155,14 @@ func run(cmd *cobra.Command, args []string) {
 						line = append(line, "--profile", profile)
 					}
 
-					iout, err := exec.Command("aws", line...).CombinedOutput()
+					b, err := exec.Command("aws", line...).CombinedOutput()
 					if err != nil {
-						fail(err)
+						fail(err, "-->", string(b))
 						return
 					}
 
 					var v instW
-					err = json.Unmarshal(iout, &v)
+					err = json.Unmarshal(b, &v)
 					if err != nil {
 						fail(err)
 						return
