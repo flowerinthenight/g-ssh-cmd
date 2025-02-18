@@ -18,4 +18,7 @@ $ g-ssh-cmd asg my-asg 'journalctl -f' --id-file ~/.ssh/key.pem
 
 # Tail all GCP MIG VMs' system logs:
 $ g-ssh-cmd mig my-mig 'journalctl -f'
+
+# You might need to do a '2>&1' to grep:
+$ g-ssh-cmd mig my-mig 'journalctl -f' 2>&1 | grep -i 'something'
 ```
