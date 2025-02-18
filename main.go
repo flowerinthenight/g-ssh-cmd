@@ -43,7 +43,7 @@ var (
 	}
 )
 
-// AWS-related definitions
+// AWS and GCP combined, we only define what we need.
 type instanceT struct {
 	// AWS
 	InstanceId      string
@@ -53,6 +53,7 @@ type instanceT struct {
 	Instance string `json:"instance"`
 }
 
+// AWS-related defintions.
 type asgT struct {
 	Instances []instanceT
 }
@@ -69,7 +70,7 @@ type instW struct {
 	Reservations []reservationT
 }
 
-// GCP-related definitions
+// GCP-related definitions.
 type migW struct {
 	Name   string `json:"name"`
 	Region string `json:"region"`
@@ -276,12 +277,15 @@ func run(cmd *cobra.Command, args []string) {
 			}
 
 			name := ss[10]
-			zone := ss[8]
-			info(name, zone)
+			sshZone := ss[8]
 
 			var add strings.Builder
-			fmt.Fprintf(&add, "gcloud compute ssh --zone %v %v ", zone, name)
-			fmt.Fprintf(&add, "--project %v --quiet --command='%v' -- -t", project, args[2])
+			fmt.Fprintf(&add, "gcloud compute ssh --zone %v %v --quiet", sshZone, name)
+			if project != "" {
+				fmt.Fprintf(&add, " --project=%v", project)
+			}
+
+			fmt.Fprintf(&add, " --command='%v' -- -t", args[2])
 			addcmd := exec.Command("bash", "-c", add.String())
 
 			mtx.Lock()
