@@ -12,8 +12,8 @@ Basic usage looks something like:
 
 ``` sh
 # Tail all AWS ASG VMs' system logs:
-$ g-ssh-cmd my-autoscaling-group 'journalctl -f' --id-file ~/.ssh/key.pem
+$ g-ssh-cmd asg my-asg 'journalctl -f' --id-file ~/.ssh/key.pem
 
 # Tail all GCP MIG VMs' system logs:
-$ g-ssh-cmd --vendor=gcp my-mig 'journalctl -f'
+$ g-ssh-cmd mig my-mig 'journalctl -f'
 ```
