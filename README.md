@@ -11,5 +11,5 @@ $ brew install flowerinthenight/tap/g-ssh-cmd
 Basic usage looks something like:
 
 ``` sh
-$ g-ssh-cmd my-autoscaling-group 'uptime' --id-file ~/.ssh/key.pem
+$ g-ssh-cmd my-autoscaling-group 'journalctl -f' --id-file ~/.ssh/key.pem
 ```
