@@ -2,6 +2,8 @@
 
 A simple wrapper to `ssh -i key ec2-user@ip -t command` for AWS AutoScaling Groups. It uses your environment's `aws` command, as well as your SSH setup behind the scenes.
 
+NOTE: This tool has been created for tailing logs from AutoScaling Group VMs in AWS without going through CloudWatch.
+
 To install using [Homebrew](https://brew.sh/):
 
 ``` sh
