@@ -1,0 +1,34 @@
+version: 2
+builds:
+- id: "g-ssh-cmd"
+  binary: g-ssh-cmd
+  goos:
+  - linux
+  - darwin
+  goarch:
+  - amd64
+checksum:
+  name_template: 'checksums.txt'
+dist: /tmp/g-ssh-cmd/dist
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
+release:
+  github:
+    owner: flowerinthenight
+    name: g-ssh-cmd
+brews:
+- repository:
+    owner: flowerinthenight
+    name: homebrew-tap
+  name: g-ssh-cmd
+  homepage: "https://github.com/flowerinthenight/g-ssh-cmd"
+  description: "A simple wrapper to [ssh -t cmd] for AutoScaling Groups."
+  directory: Formula
+  install: |
+    bin.install "g-ssh-cmd"
+  test: |
+    assert_match /A simple wrapper to/, shell_output("#{bin}/g-ssh-cmd -h", 0)
