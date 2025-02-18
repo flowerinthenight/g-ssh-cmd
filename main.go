@@ -24,17 +24,16 @@ var (
 	green = color.New(color.FgGreen).SprintFunc()
 	red   = color.New(color.FgRed).SprintFunc()
 
-	vendor     string
-	gcpProject string // for GCP only
-	gcpRegion  string // for GCP only
-	stdout     bool
-	stderr     bool
-	idFile     string
-	mtx        sync.Mutex
-	cs         map[string]*exec.Cmd
+	profile string // for AWS only
+	project string // for GCP only
+	stdout  bool
+	stderr  bool
+	idFile  string
+	mtx     sync.Mutex
+	cs      map[string]*exec.Cmd
 
 	rootCmd = &cobra.Command{
-		Use:   "g-ssh-cmd <group-name> 'cmd'",
+		Use:   "g-ssh-cmd <asg|mig> <group-name> <cmd>",
 		Short: "A simple wrapper to [ssh user@host -t 'cmd'] for AWS ASGs and GCP MIGs",
 		Long: `A simple wrapper to [ssh user@host -t 'cmd'] for AWS ASGs and GCP MIGs.
 
@@ -74,6 +73,7 @@ type instW struct {
 type migW struct {
 	Name   string `json:"name"`
 	Region string `json:"region"`
+	Zone   string `json:"zone"`
 }
 
 func main() {
@@ -95,39 +95,36 @@ func main() {
 	}()
 
 	rootCmd.Flags().SortFlags = false
-	rootCmd.Flags().StringVar(&vendor, "vendor", "aws", "target vendor, values: 'aws', 'gcp'")
 	rootCmd.Flags().StringVar(&idFile, "id-file", "", "identity file, input to -i in ssh (AWS only)")
 	rootCmd.Flags().BoolVar(&stdout, "stdout", true, "print stdout output")
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
-	rootCmd.Flags().StringVar(&gcpProject, "gcp-project", "", "valid only if --vendor=gcp, optional (inferred)")
-	rootCmd.Flags().StringVar(&gcpRegion, "gcp-region", "", "valid only if --vendor=gcp, optional (inferred)")
+	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
+	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
 	rootCmd.Execute()
 }
 
 func run(cmd *cobra.Command, args []string) {
-	if len(args) < 1 {
-		fail("no scaling group name provided")
-		return
-	}
-
-	if len(args) < 2 {
-		fail("no command(s) provided")
+	if len(args) < 3 {
+		fail("invalid arguments, see -h")
 		return
 	}
 
 	cs = make(map[string]*exec.Cmd)
 
-	switch vendor {
-	case "aws":
-		xcmd := exec.Command(
-			"aws",
+	switch args[0] {
+	case "asg":
+		line := []string{
 			"autoscaling",
 			"describe-auto-scaling-groups",
 			"--auto-scaling-group-name",
-			args[0],
-		)
+			args[1],
+		}
 
-		out, err := xcmd.CombinedOutput()
+		if profile != "" {
+			line = append(line, "--profile", profile)
+		}
+
+		out, err := exec.Command("aws", line...).CombinedOutput()
 		if err != nil {
 			fail(err)
 			return
@@ -146,15 +143,18 @@ func run(cmd *cobra.Command, args []string) {
 				wg.Add(1)
 				go func(id string) {
 					defer wg.Done()
-					xcmd = exec.Command(
-						"aws",
+					line := []string{
 						"ec2",
 						"describe-instances",
 						"--instance-ids",
 						id,
-					)
+					}
 
-					iout, err := xcmd.CombinedOutput()
+					if profile != "" {
+						line = append(line, "--profile", profile)
+					}
+
+					iout, err := exec.Command("aws", line...).CombinedOutput()
 					if err != nil {
 						fail(err)
 						return
@@ -177,7 +177,7 @@ func run(cmd *cobra.Command, args []string) {
 								"StrictHostKeyChecking=accept-new",
 								fmt.Sprintf("ec2-user@%v", y.PublicIpAddress),
 								"-t",
-								args[1],
+								args[2],
 							)
 
 							mtx.Lock()
@@ -190,40 +190,74 @@ func run(cmd *cobra.Command, args []string) {
 
 			wg.Wait()
 		}
-	case "gcp":
+	case "mig":
 		var line strings.Builder
-		if gcpProject == "" || gcpRegion == "" {
-			fmt.Fprintf(&line, "gcloud compute instance-groups managed list ")
-			fmt.Fprintf(&line, "--filter=\"name=('%v')\" --format json", args[0])
-			out, err := exec.Command("bash", "-c", line.String()).CombinedOutput()
-			if err != nil {
-				fail(err)
-				return
+		fmt.Fprintf(&line, "gcloud compute instance-groups managed list --format=json")
+		if project != "" {
+			fmt.Fprintf(&line, " --project=%v", project)
+		}
+
+		out, err := exec.Command("bash", "-c", line.String()).CombinedOutput()
+		if err != nil {
+			fail(err, "-->", string(out))
+			return
+		}
+
+		var t []migW
+		err = json.Unmarshal(out, &t)
+		if err != nil {
+			fail(err)
+			return
+		}
+
+		var region, zone string
+		var found bool
+		for _, v := range t {
+			if v.Name != args[1] {
+				continue
 			}
 
-			var t []migW
-			err = json.Unmarshal(out, &t)
-			if err != nil {
-				fail(err)
-				return
-			}
-
-			for _, v := range t {
-				ss := strings.Split(v.Region, "/")
+			found = true
+			if v.Region != "" && region == "" {
 				// Fmt: https://www.googleapis.com/compute/v1/projects/v/regions/v
+				ss := strings.Split(v.Region, "/")
 				if len(ss) >= 9 {
-					gcpProject = ss[6]
-					gcpRegion = ss[8]
+					region = ss[8]
+				}
+			}
+
+			if v.Zone != "" && zone == "" {
+				// Fmt: https://www.googleapis.com/compute/v1/projects/v/zones/v
+				ss := strings.Split(v.Zone, "/")
+				if len(ss) >= 9 {
+					zone = ss[8]
 				}
 			}
 		}
 
+		if !found {
+			fail(args[1], "not found")
+			return
+		}
+
 		line.Reset()
-		fmt.Fprintf(&line, "gcloud compute instance-groups managed list-instances rmig ")
-		fmt.Fprintf(&line, "--project=%v --region=%v --format json", gcpProject, gcpRegion)
-		out, err := exec.Command("bash", "-c", line.String()).CombinedOutput()
+		fmt.Fprintf(&line, "gcloud compute instance-groups managed ")
+		fmt.Fprintf(&line, "list-instances %v --format=json", args[1])
+		if project != "" {
+			fmt.Fprintf(&line, " --project=%v", project)
+		}
+
+		if region != "" {
+			fmt.Fprintf(&line, " --region=%v", region)
+		}
+
+		if zone != "" {
+			fmt.Fprintf(&line, " --zone=%v", zone)
+		}
+
+		out, err = exec.Command("bash", "-c", line.String()).CombinedOutput()
 		if err != nil {
-			fail(err)
+			fail(err, "-->", string(out))
 			return
 		}
 
@@ -247,7 +281,7 @@ func run(cmd *cobra.Command, args []string) {
 
 			var add strings.Builder
 			fmt.Fprintf(&add, "gcloud compute ssh --zone %v %v ", zone, name)
-			fmt.Fprintf(&add, "--project %v --quiet --command='%v' -- -t", gcpProject, args[1])
+			fmt.Fprintf(&add, "--project %v --quiet --command='%v' -- -t", project, args[2])
 			addcmd := exec.Command("bash", "-c", add.String())
 
 			mtx.Lock()
@@ -255,7 +289,7 @@ func run(cmd *cobra.Command, args []string) {
 			mtx.Unlock()
 		}
 	default:
-		fail("invalid vendor")
+		fail("invalid argument(s), see -h")
 		return
 	}
 
