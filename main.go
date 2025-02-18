@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -27,12 +28,12 @@ var (
 	cs      map[string]*exec.Cmd
 
 	rootCmd = &cobra.Command{
-		Use:   "kubepfm",
-		Short: "A simple port-forward wrapper tool for multiple pods/deployments/services",
-		Long: `A simple port-forward wrapper tool for multiple pods/deployments/services.
+		Use:   "asg-ssh-cmd",
+		Short: "A simple wrapper to [ssh -i key ec2-user@target -t 'cmd'] for AWS AutoScaling Groups",
+		Long: `A simple wrapper to [ssh -i key ec2-user@target -t 'cmd'] for AWS AutoScaling Groups.
 
 [version=` + version + `, commit=` + commit + `]`,
-		RunE:         Run,
+		Run:          run,
 		SilenceUsage: true,
 	}
 )
@@ -142,7 +143,83 @@ func parse(in string) ([]string, string, string, string, string) {
 	return args, ctx, name, ports, address
 }
 
-func Run(cmd *cobra.Command, args []string) error {
+type instanceT struct {
+	InstanceId      string
+	PublicIpAddress string
+}
+
+type asgT struct {
+	Instances []instanceT
+}
+
+type asgW struct {
+	AutoScalingGroups []asgT
+}
+
+type reservationT struct {
+	Instances []instanceT
+}
+
+type instW struct {
+	Reservations []reservationT
+}
+
+func run(cmd *cobra.Command, args []string) {
+	xcmd := exec.Command(
+		"aws",
+		"autoscaling",
+		"describe-auto-scaling-groups",
+		"--auto-scaling-group-name",
+		args[0],
+	)
+
+	out, err := xcmd.CombinedOutput()
+	if err != nil {
+		fail(err)
+		return
+	} else {
+		var t asgW
+		err = json.Unmarshal(out, &t)
+		if err != nil {
+			fail(err)
+			return
+		}
+
+		for _, i := range t.AutoScalingGroups {
+			for _, j := range i.Instances {
+				info("inst:", j.InstanceId)
+				xcmd = exec.Command(
+					"aws",
+					"ec2",
+					"describe-instances",
+					"--instance-ids",
+					j.InstanceId,
+				)
+
+				iout, err := xcmd.CombinedOutput()
+				if err != nil {
+					fail(err)
+					continue
+				}
+
+				var v instW
+				err = json.Unmarshal(iout, &v)
+				if err != nil {
+					fail(err)
+					continue
+				}
+
+				for _, x := range v.Reservations {
+					for _, y := range x.Instances {
+						info("  ip:", y.PublicIpAddress)
+					}
+				}
+			}
+		}
+
+		return
+	}
+
 	if len(targets) == 0 {
 		info("no target inputs, read from stdin")
 		scanner := bufio.NewScanner(os.Stdin)
@@ -159,7 +236,7 @@ func Run(cmd *cobra.Command, args []string) error {
 	for _, c := range targets {
 		v, ctx, name, portpair, address := parse(c)
 		if v == nil {
-			return fmt.Errorf("invalid target: %v", c)
+			return
 		}
 
 		rctype := v[1]
@@ -209,7 +286,7 @@ func Run(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(cs) == 0 {
-		return nil
+		return
 	}
 
 	done := make(chan error)
@@ -263,7 +340,6 @@ func Run(cmd *cobra.Command, args []string) error {
 	}
 
 	<-done
-	return nil
 }
 
 func info(v ...interface{}) {
