@@ -286,11 +286,7 @@ func run(cmd *cobra.Command, args []string) {
 			}
 
 			fmt.Fprintf(&add, " --command='%v' -- -t", args[2])
-			addcmd := exec.Command("sh", "-c", add.String())
-
-			mtx.Lock()
-			cs[name] = addcmd
-			mtx.Unlock()
+			cs[name] = exec.Command("sh", "-c", add.String())
 		}
 	default:
 		fail("invalid argument(s), see -h")
