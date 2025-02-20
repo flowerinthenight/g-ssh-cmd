@@ -95,6 +95,7 @@ func main() {
 		os.Exit(0)
 	}()
 
+	log.SetOutput(os.Stdout)
 	rootCmd.Flags().SortFlags = false
 	rootCmd.Flags().StringVar(&idFile, "id-file", "", "identity file, input to -i in ssh (AWS only)")
 	rootCmd.Flags().BoolVar(&stdout, "stdout", true, "print stdout output")
