@@ -25,14 +25,14 @@ var (
 	green = color.New(color.FgGreen).SprintFunc()
 	red   = color.New(color.FgRed).SprintFunc()
 
-	profile  string // for AWS only
-	project  string // for GCP only
-	vmFilter string // GCP only for now
-	stdout   bool
-	stderr   bool
-	idFile   string
-	mtx      sync.Mutex
-	cs       map[string]*exec.Cmd
+	profile string // for AWS only
+	project string // for GCP only
+	only    string // GCP only for now
+	stdout  bool
+	stderr  bool
+	idFile  string
+	mtx     sync.Mutex
+	cs      map[string]*exec.Cmd
 
 	rootCmd = &cobra.Command{
 		Use:   "g-ssh-cmd <asg|mig> <group-name> <cmd>",
@@ -104,7 +104,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
 	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
-	rootCmd.Flags().StringVar(&vmFilter, "vmfilter", "", "VM name filter (supports glob/wildcards), valid only if 'mig', optional")
+	rootCmd.Flags().StringVar(&only, "only", "", "VM name filter (supports glob/wildcards), valid only if 'mig', optional")
 	rootCmd.Execute()
 }
 
@@ -283,8 +283,8 @@ func run(cmd *cobra.Command, args []string) {
 			name := ss[10]
 			sshZone := ss[8]
 
-			if vmFilter != "" {
-				matched, err := matchPattern(name, vmFilter)
+			if only != "" {
+				matched, err := matchPattern(name, only)
 				if err != nil {
 					fail(err)
 					continue
