@@ -104,7 +104,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
 	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
-	rootCmd.Flags().StringVar(&only, "only", "", "VM name filter (supports glob/wildcards), valid only if 'mig', optional")
+	rootCmd.Flags().StringVar(&only, "only", "", "filter: only these instances (supports glob/wildcards), valid only if 'mig', optional")
 	rootCmd.Execute()
 }
 
@@ -378,21 +378,6 @@ func run(cmd *cobra.Command, args []string) {
 	wg.Wait()
 }
 
-func info(v ...interface{}) {
-	m := fmt.Sprintln(v...)
-	log.Printf("%s %s", green("[info]"), m)
-}
-
-func fail(v ...interface{}) {
-	m := fmt.Sprintln(v...)
-	log.Printf("%s %s", red("[error]"), m)
-}
-
-func failx(v ...interface{}) {
-	fail(v...)
-	os.Exit(1)
-}
-
 func matchPattern(name, pattern string) (bool, error) {
 	// Simple exact match
 	if pattern == name {
@@ -414,4 +399,19 @@ func matchPattern(name, pattern string) (bool, error) {
 	}
 
 	return matched, nil
+}
+
+func info(v ...any) {
+	m := fmt.Sprintln(v...)
+	log.Printf("%s %s", green("[info]"), m)
+}
+
+func fail(v ...any) {
+	m := fmt.Sprintln(v...)
+	log.Printf("%s %s", red("[error]"), m)
+}
+
+func failx(v ...any) {
+	fail(v...)
+	os.Exit(1)
 }
