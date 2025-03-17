@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -26,6 +27,7 @@ var (
 
 	profile string // for AWS only
 	project string // for GCP only
+	only    string // GCP only for now
 	stdout  bool
 	stderr  bool
 	idFile  string
@@ -102,6 +104,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
 	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
+	rootCmd.Flags().StringVar(&only, "only", "", "VM name filter (supports glob/wildcards), valid only if 'mig', optional")
 	rootCmd.Execute()
 }
 
@@ -280,6 +283,17 @@ func run(cmd *cobra.Command, args []string) {
 			name := ss[10]
 			sshZone := ss[8]
 
+			if only != "" {
+				matched, err := matchPattern(name, only)
+				if err != nil {
+					fail(err)
+					continue
+				}
+				if !matched {
+					continue // Skip this VM if it doesn't match the filter
+				}
+			}
+
 			var add strings.Builder
 			fmt.Fprintf(&add, "gcloud compute ssh --zone %v %v --quiet", sshZone, name)
 			if project != "" {
@@ -377,4 +391,27 @@ func fail(v ...interface{}) {
 func failx(v ...interface{}) {
 	fail(v...)
 	os.Exit(1)
+}
+
+func matchPattern(name, pattern string) (bool, error) {
+	// Simple exact match
+	if pattern == name {
+		return true, nil
+	}
+
+	// Use filepath.Match for glob pattern matching
+	// This supports * and ? wildcards
+	matched, err := filepath.Match(pattern, name)
+	if err != nil {
+		return false, fmt.Errorf("invalid pattern: %v", err)
+	}
+
+	// Also check for contains match if no wildcards
+	if !strings.Contains(pattern, "*") && !strings.Contains(pattern, "?") {
+		if strings.Contains(name, pattern) {
+			return true, nil
+		}
+	}
+
+	return matched, nil
 }
