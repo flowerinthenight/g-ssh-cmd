@@ -104,7 +104,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
 	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
-	rootCmd.Flags().StringVar(&only, "only", "", "filter: only these instances (supports glob/wildcards), valid only if 'mig', optional")
+	rootCmd.Flags().StringVar(&only, "only", "", "only include these instances (filename patterns, see https://pkg.go.dev/path/filepath#Match), valid only if 'mig', optional")
 	rootCmd.Execute()
 }
 
