@@ -30,7 +30,7 @@ var (
 	only    string // GCP only for now
 	stdout  bool
 	stderr  bool
-	idFile  string
+	key     string // SSH key for AWS ASG
 	mtx     sync.Mutex
 	cs      map[string]*exec.Cmd
 
@@ -99,7 +99,7 @@ func main() {
 
 	log.SetOutput(os.Stdout) // for easy grep
 	rootCmd.Flags().SortFlags = false
-	rootCmd.Flags().StringVar(&idFile, "id-file", "", "identity file, input to -i in ssh (AWS only)")
+	rootCmd.Flags().StringVar(&key, "key", "", "identity file, input to -i in ssh (AWS only), same as --id-file")
 	rootCmd.Flags().BoolVar(&stdout, "stdout", true, "print stdout output")
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
@@ -177,7 +177,7 @@ func run(cmd *cobra.Command, args []string) {
 							addcmd := exec.Command(
 								"ssh",
 								"-i",
-								idFile,
+								key,
 								"-o",
 								"StrictHostKeyChecking=accept-new",
 								fmt.Sprintf("ec2-user@%v", y.PublicIpAddress),
