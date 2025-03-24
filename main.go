@@ -99,7 +99,7 @@ func main() {
 
 	log.SetOutput(os.Stdout) // for easy grep
 	rootCmd.Flags().SortFlags = false
-	rootCmd.Flags().StringVar(&key, "key", "", "identity file, input to -i in ssh (AWS only), same as --id-file")
+	rootCmd.Flags().StringVar(&key, "key", "", "identity file, input to -i in ssh (AWS only)")
 	rootCmd.Flags().BoolVar(&stdout, "stdout", true, "print stdout output")
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
