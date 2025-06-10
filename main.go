@@ -295,7 +295,7 @@ func run(cmd *cobra.Command, args []string) {
 			}
 
 			var add strings.Builder
-			fmt.Fprintf(&add, "gcloud compute ssh --zone %v %v --quiet", sshZone, name)
+			fmt.Fprintf(&add, "gcloud compute ssh --zone=%v %v --quiet", sshZone, name)
 			if project != "" {
 				fmt.Fprintf(&add, " --project=%v", project)
 			}
