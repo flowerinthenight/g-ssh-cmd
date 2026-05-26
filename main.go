@@ -20,7 +20,6 @@ import (
 var (
 	version = "dev"
 	commit  = "none"
-	date    = "unknown"
 
 	green = color.New(color.FgGreen).SprintFunc()
 	red   = color.New(color.FgRed).SprintFunc()
