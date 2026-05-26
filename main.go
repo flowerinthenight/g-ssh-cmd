@@ -379,19 +379,15 @@ func run(cmd *cobra.Command, args []string) {
 }
 
 func matchPattern(name, pattern string) (bool, error) {
-	// Simple exact match
 	if pattern == name {
 		return true, nil
 	}
 
-	// Use filepath.Match for glob pattern matching
-	// This supports * and ? wildcards
 	matched, err := filepath.Match(pattern, name)
 	if err != nil {
 		return false, fmt.Errorf("invalid pattern: %v", err)
 	}
 
-	// Also check for contains match if no wildcards
 	if !strings.Contains(pattern, "*") && !strings.Contains(pattern, "?") {
 		if strings.Contains(name, pattern) {
 			return true, nil
