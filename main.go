@@ -117,6 +117,11 @@ func run(cmd *cobra.Command, args []string) {
 
 	switch args[0] {
 	case "asg":
+		if _, err := exec.LookPath("aws"); err != nil {
+			fail("aws cli not found in environment, please install it first")
+			return
+		}
+
 		line := []string{
 			"autoscaling",
 			"describe-auto-scaling-groups",
@@ -195,6 +200,11 @@ func run(cmd *cobra.Command, args []string) {
 			wg.Wait()
 		}
 	case "mig":
+		if _, err := exec.LookPath("gcloud"); err != nil {
+			fail("gcloud cli not found in environment, please install it first")
+			return
+		}
+
 		var line strings.Builder
 		fmt.Fprintf(&line, "gcloud compute instance-groups managed list --format=json")
 		if project != "" {
