@@ -79,6 +79,8 @@ type migW struct {
 }
 
 func main() {
+	log.SetFlags(0)
+
 	go func() {
 		s := make(chan os.Signal, 1)
 		signal.Notify(s, syscall.SIGINT, syscall.SIGTERM)
@@ -346,10 +348,13 @@ func run(cmd *cobra.Command, args []string) {
 
 			var pwg sync.WaitGroup
 			if stdout {
-				pwg.Add(1)
-				go func() {
-					defer pwg.Done()
+				pwg.Go(func() {
 					outscan := bufio.NewScanner(outpipe)
+					if outscan.Err() != nil {
+						fail(outscan.Err())
+						return
+					}
+
 					for {
 						chk := outscan.Scan()
 						if !chk {
@@ -359,14 +364,17 @@ func run(cmd *cobra.Command, args []string) {
 						stxt := outscan.Text()
 						log.Printf("%v|%v: %v", green(id), green("stdout"), stxt)
 					}
-				}()
+				})
 			}
 
 			if stderr {
-				pwg.Add(1)
-				go func() {
-					defer pwg.Done()
+				pwg.Go(func() {
 					errscan := bufio.NewScanner(errpipe)
+					if errscan.Err() != nil {
+						fail(errscan.Err())
+						return
+					}
+
 					for {
 						chk := errscan.Scan()
 						if !chk {
@@ -376,7 +384,7 @@ func run(cmd *cobra.Command, args []string) {
 						stxt := errscan.Text()
 						log.Printf("%v|%v: %v", green(id), red("stderr"), stxt)
 					}
-				}()
+				})
 			}
 
 			scmd.Wait()
