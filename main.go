@@ -362,7 +362,7 @@ func run(cmd *cobra.Command, args []string) {
 						}
 
 						stxt := outscan.Text()
-						log.Printf("%v|%v: %v", green(id), green("stdout"), stxt)
+						log.Printf("%v|%v: %v", green(id), green("1"), stxt)
 					}
 				})
 			}
@@ -382,7 +382,7 @@ func run(cmd *cobra.Command, args []string) {
 						}
 
 						stxt := errscan.Text()
-						log.Printf("%v|%v: %v", green(id), red("stderr"), stxt)
+						log.Printf("%v|%v: %v", green(id), red("2"), stxt)
 					}
 				})
 			}
