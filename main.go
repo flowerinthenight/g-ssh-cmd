@@ -26,6 +26,7 @@ var (
 
 	profile string // for AWS only
 	project string // for GCP only
+	region  string // GCP only, comma-separated
 	only    string // GCP only for now
 	stdout  bool
 	stderr  bool
@@ -105,6 +106,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&stderr, "stderr", true, "print stderr output")
 	rootCmd.Flags().StringVar(&profile, "profile", "", "AWS profile, valid only if 'asg', optional")
 	rootCmd.Flags().StringVar(&project, "project", "", "GCP project, valid only if 'mig', optional")
+	rootCmd.Flags().StringVar(&region, "region", "", "GCP region(s), comma-separated to target/filter multiple regions, valid only if 'mig', optional")
 	rootCmd.Flags().StringVar(&only, "only", "", "only include these instances (filename patterns, see https://pkg.go.dev/path/filepath#Match), valid only if 'mig', optional")
 	rootCmd.Execute()
 }
@@ -226,7 +228,23 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 
-		var region, zone string
+		// Optional comma-separated region filter, e.g. "us-central1,asia-east1".
+		regionFilter := make(map[string]bool)
+		for _, r := range strings.Split(region, ",") {
+			r = strings.TrimSpace(r)
+			if r != "" {
+				regionFilter[r] = true
+			}
+		}
+
+		// A MIG name can collide across regions/zones, so collect every match
+		// (optionally narrowed by --region) and fan out to all of them.
+		type migTarget struct {
+			region string
+			zone   string
+		}
+
+		var targets []migTarget
 		var found bool
 		for _, v := range t {
 			if v.Name != args[1] {
@@ -234,21 +252,40 @@ func run(cmd *cobra.Command, args []string) {
 			}
 
 			found = true
-			if v.Region != "" && region == "" {
+
+			var mregion, mzone string
+			if v.Region != "" {
 				// Fmt: https://www.googleapis.com/compute/v1/projects/v/regions/v
 				ss := strings.Split(v.Region, "/")
 				if len(ss) >= 9 {
-					region = ss[8]
+					mregion = ss[8]
 				}
 			}
 
-			if v.Zone != "" && zone == "" {
+			if v.Zone != "" {
 				// Fmt: https://www.googleapis.com/compute/v1/projects/v/zones/v
 				ss := strings.Split(v.Zone, "/")
 				if len(ss) >= 9 {
-					zone = ss[8]
+					mzone = ss[8]
 				}
 			}
+
+			if len(regionFilter) > 0 {
+				// Derive the region from the zone for zonal MIGs,
+				// e.g. asia-east1-a --> asia-east1.
+				effective := mregion
+				if effective == "" && mzone != "" {
+					if idx := strings.LastIndex(mzone, "-"); idx > 0 {
+						effective = mzone[:idx]
+					}
+				}
+
+				if !regionFilter[effective] {
+					continue
+				}
+			}
+
+			targets = append(targets, migTarget{region: mregion, zone: mzone})
 		}
 
 		if !found {
@@ -256,63 +293,70 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 
-		line.Reset()
-		fmt.Fprintf(&line, "gcloud compute instance-groups managed ")
-		fmt.Fprintf(&line, "list-instances %v --format=json", args[1])
-		if project != "" {
-			fmt.Fprintf(&line, " --project=%v", project)
-		}
-
-		if region != "" {
-			fmt.Fprintf(&line, " --region=%v", region)
-		}
-
-		if zone != "" {
-			fmt.Fprintf(&line, " --zone=%v", zone)
-		}
-
-		out, err = exec.Command("sh", "-c", line.String()).CombinedOutput()
-		if err != nil {
-			fail(err, "-->", string(out))
+		if len(targets) == 0 {
+			fail(args[1], "not found in region(s):", region)
 			return
 		}
 
-		var v []instanceT
-		err = json.Unmarshal(out, &v)
-		if err != nil {
-			fail(err)
-			return
-		}
-
-		for _, i := range v {
-			// Fmt: https://www.googleapis.com/compute/v1/projects/v/zones/v/instances/name
-			ss := strings.Split(i.Instance, "/")
-			if len(ss) < 11 {
-				continue
+		for _, tgt := range targets {
+			line.Reset()
+			fmt.Fprintf(&line, "gcloud compute instance-groups managed ")
+			fmt.Fprintf(&line, "list-instances %v --format=json", args[1])
+			if project != "" {
+				fmt.Fprintf(&line, " --project=%v", project)
 			}
 
-			name := ss[10]
-			sshZone := ss[8]
+			if tgt.region != "" {
+				fmt.Fprintf(&line, " --region=%v", tgt.region)
+			}
 
-			if only != "" {
-				matched, err := matchPattern(name, only)
-				if err != nil {
-					fail(err)
+			if tgt.zone != "" {
+				fmt.Fprintf(&line, " --zone=%v", tgt.zone)
+			}
+
+			out, err = exec.Command("sh", "-c", line.String()).CombinedOutput()
+			if err != nil {
+				fail(err, "-->", string(out))
+				return
+			}
+
+			var v []instanceT
+			err = json.Unmarshal(out, &v)
+			if err != nil {
+				fail(err)
+				return
+			}
+
+			for _, i := range v {
+				// Fmt: https://www.googleapis.com/compute/v1/projects/v/zones/v/instances/name
+				ss := strings.Split(i.Instance, "/")
+				if len(ss) < 11 {
 					continue
 				}
-				if !matched {
-					continue // Skip this VM if it doesn't match the filter
+
+				name := ss[10]
+				sshZone := ss[8]
+
+				if only != "" {
+					matched, err := matchPattern(name, only)
+					if err != nil {
+						fail(err)
+						continue
+					}
+					if !matched {
+						continue // Skip this VM if it doesn't match the filter
+					}
 				}
-			}
 
-			var add strings.Builder
-			fmt.Fprintf(&add, "gcloud compute ssh --zone=%v %v --quiet", sshZone, name)
-			if project != "" {
-				fmt.Fprintf(&add, " --project=%v", project)
-			}
+				var add strings.Builder
+				fmt.Fprintf(&add, "gcloud compute ssh --zone=%v %v --quiet", sshZone, name)
+				if project != "" {
+					fmt.Fprintf(&add, " --project=%v", project)
+				}
 
-			fmt.Fprintf(&add, " --command='%v' -- -t", args[2])
-			cs[name] = exec.Command("sh", "-c", add.String())
+				fmt.Fprintf(&add, " --command='%v' -- -t", args[2])
+				cs[name] = exec.Command("sh", "-c", add.String())
+			}
 		}
 	default:
 		fail("invalid argument(s), see -h")
