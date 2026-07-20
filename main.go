@@ -209,6 +209,8 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 
+		ensureGCPSSHKey()
+
 		var line strings.Builder
 		fmt.Fprintf(&line, "gcloud compute instance-groups managed list --format=json")
 		if project != "" {
@@ -471,4 +473,18 @@ func fail(v ...any) {
 func failx(v ...any) {
 	fail(v...)
 	os.Exit(1)
+}
+
+func ensureGCPSSHKey() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+
+	sshDir := filepath.Join(home, ".ssh")
+	keyPath := filepath.Join(sshDir, "google_compute_engine")
+	if _, err := os.Stat(keyPath); os.IsNotExist(err) {
+		_ = os.MkdirAll(sshDir, 0700)
+		_ = exec.Command("ssh-keygen", "-t", "rsa", "-f", keyPath, "-C", "gcloud-ssh", "-N", "").Run()
+	}
 }
